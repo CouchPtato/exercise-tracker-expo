@@ -6,6 +6,10 @@ import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Link } from 'expo-router';
+import { registerRootComponent } from 'expo';
+import App from '../../App';   // make sure this path points to your App.js
+
+registerRootComponent(App);
 
 export default function HomeScreen() {
   return (
