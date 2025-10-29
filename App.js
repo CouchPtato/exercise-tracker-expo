@@ -5,7 +5,7 @@ import axios from "axios";
 export default function App() {
   const [data, setData] = useState({});
   const [selectedExercise, setSelectedExercise] = useState(null);
-  const backend = "http://192.168.1.7:8000";
+  const backend = "http://192.168.x.x:8000";
 
   const startExercise = async (name) => {
     setSelectedExercise(name);
