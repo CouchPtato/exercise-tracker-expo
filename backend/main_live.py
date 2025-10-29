@@ -1,107 +1,115 @@
-from fastapi import FastAPI, WebSocket
-import cv2, base64, numpy as np, json, mediapipe as mp
+from fastapi import FastAPI, Query
+from fastapi.responses import StreamingResponse, JSONResponse
+import cv2
+import mediapipe as mp
+import math
+import threading
+import io
 
-app = FastAPI(title="Live Exercise Tracker")
+app = FastAPI()
 
-# Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
+mp_draw = mp.solutions.drawing_utils
 pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
-# ---------- Helper function ----------
-def calc_angle(a, b, c):
-    """Calculate angle between three points."""
-    a, b, c = np.array(a), np.array(b), np.array(c)
-    angle = np.degrees(
-        np.arctan2(c[1] - b[1], c[0] - b[0])
-        - np.arctan2(a[1] - b[1], a[0] - b[0])
-    )
-    angle = abs(angle)
+camera = cv2.VideoCapture(0)
+lock = threading.Lock()
+
+current_exercise = None
+exercise_data = {"angle": 0, "count": 0, "stage": "", "form": "good"}
+running = False
+
+def calculate_angle(a, b, c):
+    rads = math.atan2(c[1] - b[1], c[0] - b[0]) - math.atan2(a[1] - b[1], a[0] - b[0])
+    angle = abs(rads * 180 / math.pi)
     if angle > 180:
         angle = 360 - angle
     return angle
 
+def track_exercise():
+    global running, current_exercise, exercise_data
+    frame_count = 0
 
-# ---------- WebSocket endpoint ----------
-@app.websocket("/ws/track")
-async def websocket_endpoint(ws: WebSocket):
-    await ws.accept()
-    print("✅ Client connected")
+    while running:
+        status, frame = camera.read()
+        if not status:
+            break
 
-    counter, stage = 0, None
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = pose.process(image)
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-    try:
-        while True:
-            # Receive frame from client
-            data = await ws.receive_text()
-            frame_data = json.loads(data)
-
-            # Stop if client sends END signal
-            if frame_data.get("type") == "END":
-                print("🛑 Session ended by client")
-                break
-
-            # Decode image from Base64
-            img_b64 = frame_data.get("frame", "")
-            if not img_b64:
-                continue
-
-            try:
-                frame_bytes = base64.b64decode(img_b64.split(",")[-1])
-                npimg = np.frombuffer(frame_bytes, np.uint8)
-                frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-            except Exception as e:
-                print("⚠️ Frame decode error:", e)
-                continue
-
-            # Run pose detection
-            results = pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
-            # If no pose detected, send placeholder
-            if not results.pose_landmarks:
-                await ws.send_text(json.dumps({
-                    "angle": 0,
-                    "stage": "-",
-                    "counter": counter,
-                    "form": "no_pose"
-                }))
-                continue
-
-            lm = results.pose_landmarks.landmark
-            get_xy = lambda idx: [lm[idx].x, lm[idx].y]
-
-            # Right arm landmarks
-            shoulder = get_xy(mp_pose.PoseLandmark.RIGHT_SHOULDER.value)
-            elbow = get_xy(mp_pose.PoseLandmark.RIGHT_ELBOW.value)
-            wrist = get_xy(mp_pose.PoseLandmark.RIGHT_WRIST.value)
-
-            # Calculate angle
-            angle = calc_angle(shoulder, elbow, wrist)
-
-            # Stage + Counter logic
+        if results.pose_landmarks:
+            landmarks = results.pose_landmarks.landmark
             form = "good"
-            if angle > 160:
-                stage = "down"
-            if angle < 50 and stage == "down":
-                stage = "up"
-                counter += 1
-            if angle < 30 or angle > 170:
-                form = "bad"
+            angle = None
+            counter = exercise_data["count"]
+            stage = exercise_data["stage"]
 
-            # Prepare result
-            msg = {
-                "angle": round(angle, 1),
-                "stage": stage or "-",
-                "counter": counter,
-                "form": form,
+            # Handle different exercises
+            def get_point(idx): return [landmarks[idx].x, landmarks[idx].y]
+
+            if current_exercise == "bicep_curl":
+                shoulder, elbow, wrist = get_point(mp_pose.PoseLandmark.RIGHT_SHOULDER.value), \
+                                         get_point(mp_pose.PoseLandmark.RIGHT_ELBOW.value), \
+                                         get_point(mp_pose.PoseLandmark.RIGHT_WRIST.value)
+                angle = calculate_angle(shoulder, elbow, wrist)
+                if angle > 160: stage = "down"
+                if angle < 50 and stage == "down":
+                    stage = "up"; counter += 1
+                if angle < 30 or angle > 170: form = "bad"
+
+            elif current_exercise == "squat":
+                hip, knee, ankle = get_point(mp_pose.PoseLandmark.RIGHT_HIP.value), \
+                                   get_point(mp_pose.PoseLandmark.RIGHT_KNEE.value), \
+                                   get_point(mp_pose.PoseLandmark.RIGHT_ANKLE.value)
+                angle = calculate_angle(hip, knee, ankle)
+                if angle > 160: stage = "up"
+                if angle < 90 and stage == "up":
+                    stage = "down"; counter += 1
+                if angle < 70 or angle > 170: form = "bad"
+
+            elif current_exercise == "shoulder_abduction":
+                hip, shoulder, elbow = get_point(mp_pose.PoseLandmark.RIGHT_HIP.value), \
+                                       get_point(mp_pose.PoseLandmark.RIGHT_SHOULDER.value), \
+                                       get_point(mp_pose.PoseLandmark.RIGHT_ELBOW.value)
+                angle = calculate_angle(hip, shoulder, elbow)
+                if angle < 30: stage = "down"
+                if angle > 80 and stage == "down":
+                    stage = "up"; counter += 1
+                if angle < 20 or angle > 120: form = "bad"
+
+            # ✳️ Add 3 more physiotherapy exercises here
+            # e.g., knee_extension, leg_raise, side_bend with their angle logic
+
+            exercise_data = {
+                "angle": round(angle, 2) if angle else 0,
+                "count": counter,
+                "stage": stage,
+                "form": form
             }
 
-            # Send live data back to frontend
-            await ws.send_text(json.dumps(msg))
-            print("📤 Sent:", msg)
+        frame_count += 1
 
-    except Exception as e:
-        print("❌ WebSocket error:", e)
+@app.post("/start_exercise")
+def start_exercise(name: str = Query(...)):
+    global running, current_exercise
+    if running:
+        return JSONResponse({"error": "Exercise already running"}, status_code=400)
+    current_exercise = name
+    running = True
+    thread = threading.Thread(target=track_exercise)
+    thread.start()
+    return {"message": f"Started tracking {name}"}
 
-    finally:
-        await ws.close()
-        print("🔒 WebSocket closed")
+@app.post("/stop")
+def stop_exercise():
+    global running, current_exercise
+    running = False
+    current_exercise = None
+    return {"message": "Stopped tracking"}
+
+@app.get("/data")
+def get_data():
+    """Frontend polls this endpoint every 1s for live updates"""
+    return exercise_data
