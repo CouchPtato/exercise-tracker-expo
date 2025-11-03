@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { View, Button, Text, StyleSheet, TouchableOpacity, Alert, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from "react-native";
 import Svg, { Circle, Line } from "react-native-svg";
 import * as ImagePicker from "expo-image-picker";
+import { Camera, useCameraPermissions } from "expo-camera"; // ✅ fixed import
+import { Video } from "expo-av";
 import axios from "axios";
 
 export default function App() {
@@ -10,8 +12,10 @@ export default function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [videoUri, setVideoUri] = useState(null);
   const [imageUri, setImageUri] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
-  const backend = "http://192.168.1.6:8000"; // ✅ your backend IP
+  const backend = "http://192.168.x.x:8000"; // ✅ your backend IP
 
   // Start a new exercise session
   const startExercise = async (exerciseName) => {
@@ -39,13 +43,14 @@ export default function App() {
       setData({});
       setVideoUri(null);
       setImageUri(null);
+      setIsProcessing(false);
       Alert.alert("🛑 Session Stopped", "Exercise tracking stopped.");
     } catch (err) {
       console.error("Stop error:", err.message);
     }
   };
 
-  // Upload a video to backend
+  // Upload a video and analyze it
   const uploadVideo = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -56,6 +61,7 @@ export default function App() {
       if (!result.canceled) {
         const uri = result.assets[0].uri;
         setVideoUri(uri);
+        setIsProcessing(true);
 
         const formData = new FormData();
         formData.append("file", {
@@ -69,17 +75,28 @@ export default function App() {
         });
 
         setData(res.data);
-        Alert.alert("📹 Video uploaded", "Processing completed!");
+        setIsProcessing(false);
+        Alert.alert("📹 Video Uploaded", "Analysis complete!");
       }
     } catch (err) {
       console.error("Upload error:", err.message);
+      setIsProcessing(false);
       Alert.alert("❌ Error", "Failed to upload video.");
     }
   };
 
-  // Use live camera to capture an image (single frame)
+  // Capture a live frame
   const captureFrame = async () => {
     try {
+      // ✅ Check camera permissions
+      if (!permission || !permission.granted) {
+        const { granted } = await requestPermission();
+        if (!granted) {
+          Alert.alert("Permission required", "Camera permission is needed to capture frames.");
+          return;
+        }
+      }
+
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
       });
@@ -87,6 +104,7 @@ export default function App() {
       if (!result.canceled) {
         const uri = result.assets[0].uri;
         setImageUri(uri);
+        setIsProcessing(true);
 
         const formData = new FormData();
         formData.append("file", {
@@ -100,13 +118,15 @@ export default function App() {
         });
 
         setData(res.data);
+        setIsProcessing(false);
       }
     } catch (err) {
       console.error("Camera error:", err.message);
+      setIsProcessing(false);
     }
   };
 
-  // Poll live data every 1s
+  // Poll backend live data every second
   useEffect(() => {
     let interval;
     if (isTracking && selectedExercise) {
@@ -122,10 +142,11 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isTracking, selectedExercise]);
 
-  // ✅ Draw skeleton based on backend keypoints
+  // ✅ Draw skeleton overlay
   const renderSkeleton = () => {
     if (!data.keypoints) return null;
-    const width = 300, height = 300;
+    const width = 320,
+      height = 240;
 
     const getCoord = (x, y) => ({
       cx: x * width,
@@ -138,15 +159,30 @@ export default function App() {
     });
 
     return (
-      <Svg height={height} width={width} style={styles.skeletonBox}>
+      <Svg height={height} width={width} style={styles.skeletonOverlay}>
+        {/* Example limbs */}
         {points.shoulder && points.elbow && (
-          <Line x1={points.shoulder.cx} y1={points.shoulder.cy} x2={points.elbow.cx} y2={points.elbow.cy} stroke="blue" strokeWidth="3" />
+          <Line
+            x1={points.shoulder.cx}
+            y1={points.shoulder.cy}
+            x2={points.elbow.cx}
+            y2={points.elbow.cy}
+            stroke="blue"
+            strokeWidth="3"
+          />
         )}
         {points.elbow && points.wrist && (
-          <Line x1={points.elbow.cx} y1={points.elbow.cy} x2={points.wrist.cx} y2={points.wrist.cy} stroke="blue" strokeWidth="3" />
+          <Line
+            x1={points.elbow.cx}
+            y1={points.elbow.cy}
+            x2={points.wrist.cx}
+            y2={points.wrist.cy}
+            stroke="blue"
+            strokeWidth="3"
+          />
         )}
         {Object.values(points).map((p, i) => (
-          <Circle key={i} cx={p.cx} cy={p.cy} r="5" fill="red" />
+          <Circle key={i} cx={p.cx} cy={p.cy} r="4" fill="red" />
         ))}
       </Svg>
     );
@@ -174,10 +210,29 @@ export default function App() {
           <Text style={styles.info}>Stage: {data.stage || "—"}</Text>
           <Text style={styles.info}>Form: {data.form || "—"}</Text>
 
-          <View style={{ marginVertical: 20 }}>
-            {imageUri && <Image source={{ uri: imageUri }} style={styles.imagePreview} />}
+          <View style={styles.videoContainer}>
+            {/* ✅ Uploaded Video */}
+            {videoUri && (
+              <Video
+                source={{ uri: videoUri }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode="contain"
+                shouldPlay
+                useNativeControls
+                style={styles.videoPreview}
+              />
+            )}
+
+            {/* ✅ Captured Image */}
+            {imageUri && <Image source={{ uri: imageUri }} style={styles.videoPreview} />}
+
+            {/* ✅ Skeleton Overlay */}
             {renderSkeleton()}
           </View>
+
+          {isProcessing && <Text style={styles.processing}>⏳ Processing...</Text>}
 
           <TouchableOpacity style={styles.uploadBtn} onPress={uploadVideo}>
             <Text style={styles.uploadText}>Upload Video 🎥</Text>
@@ -187,7 +242,9 @@ export default function App() {
             <Text style={styles.captureText}>Capture Frame 📸</Text>
           </TouchableOpacity>
 
-          <Button title="Stop Session" onPress={stopExercise} color="#FF4444" />
+          <TouchableOpacity style={styles.stopBtn} onPress={stopExercise}>
+            <Text style={styles.stopText}>Stop Session 🛑</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -195,76 +252,21 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f2f2",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  buttonGroup: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
-  button: {
-    backgroundColor: "#4CAF50",
-    margin: 5,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
-  dataBox: {
-    width: "100%",
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 10,
-    elevation: 3,
-    alignItems: "center",
-  },
-  info: {
-    fontSize: 16,
-    marginVertical: 4,
-  },
-  skeletonBox: {
-    backgroundColor: "#eee",
-    borderRadius: 10,
-  },
-  uploadBtn: {
-    backgroundColor: "#2196F3",
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 5,
-  },
-  uploadText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  captureBtn: {
-    backgroundColor: "#FF9800",
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 5,
-  },
-  captureText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  imagePreview: {
-    width: 300,
-    height: 200,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
+  container: { flex: 1, backgroundColor: "#f2f2f2", alignItems: "center", justifyContent: "center", padding: 20 },
+  title: { fontSize: 22, fontWeight: "700", marginBottom: 20, textAlign: "center" },
+  buttonGroup: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center" },
+  button: { backgroundColor: "#4CAF50", margin: 5, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 10 },
+  buttonText: { color: "#fff", fontWeight: "600", textTransform: "capitalize" },
+  dataBox: { width: "100%", backgroundColor: "#fff", padding: 15, borderRadius: 10, elevation: 3, alignItems: "center" },
+  info: { fontSize: 16, marginVertical: 4 },
+  videoContainer: { position: "relative", marginVertical: 20 },
+  videoPreview: { width: 320, height: 240, borderRadius: 10, backgroundColor: "#000" },
+  skeletonOverlay: { position: "absolute", top: 0, left: 0 },
+  uploadBtn: { backgroundColor: "#2196F3", padding: 10, borderRadius: 10, marginVertical: 5 },
+  uploadText: { color: "#fff", fontWeight: "600" },
+  captureBtn: { backgroundColor: "#FF9800", padding: 10, borderRadius: 10, marginVertical: 5 },
+  captureText: { color: "#fff", fontWeight: "600" },
+  stopBtn: { backgroundColor: "#FF4444", padding: 10, borderRadius: 10, marginVertical: 10 },
+  stopText: { color: "#fff", fontWeight: "600" },
+  processing: { marginVertical: 10, fontStyle: "italic", color: "gray" },
 });
