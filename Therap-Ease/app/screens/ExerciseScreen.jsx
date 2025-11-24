@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { ColorTheme } from "../../constants/GlobalStyles";
 
-//tutorial URL (replace with your real links)
+//tutorial URL
 const EXERCISE_TUTORIALS = {
   squat: "https://www.youtube.com/watch?v=aclHkVaku9U",
   bicep_curl: "https://www.youtube.com/watch?v=ykJmrZ5v0Oo",
