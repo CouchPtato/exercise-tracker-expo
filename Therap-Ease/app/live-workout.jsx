@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Line } from "react-native-svg";
 import { ColorTheme } from "../constants/GlobalStyles";
 
-const API_BASE = "http://192.168.1.9:8000";
+const API_BASE = "http://192.168.X.X:8000";
 
 // how often we *actually* want to send frames (ms)
 const SAMPLE_INTERVAL = 300;
