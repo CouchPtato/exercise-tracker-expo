@@ -1026,6 +1026,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#000",
+    position: "relative"
   },
   camera: { flex: 1 },
   cameraSwitchBtn: {

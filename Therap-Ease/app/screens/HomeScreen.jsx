@@ -233,7 +233,7 @@ function ThirdCard({ role }) {
         id: "2",
         title: "Bicep Curl",
         exerciseKey: "bicep_curl",
-        sub: "4 x 10",
+        sub: "3 x 5",
         reps: 5,
         sets: 3,
         doctor: "Dr. ABC",
