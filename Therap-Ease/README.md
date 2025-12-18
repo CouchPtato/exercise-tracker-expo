@@ -1,50 +1,62 @@
-# Welcome to your Expo app 👋
+# 🚀 Therap-Ease  
+### *AI-Powered Physiotherapy Tracking & Remote Recovery System*
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Therap-Ease is an intelligent physiotherapy platform designed to modernize exercise tracking, patient monitoring, and remote therapy. It uses **AI pose estimation**, **real-time movement analysis**, and **automated progress reporting** to make therapy accessible, accurate, and efficient from anywhere.
 
-## Get started
+---
 
-1. Install dependencies
+## ✨ Features
 
-   ```bash
-   npm install
-   ```
+### 🎥 **AI-Based Exercise Tracking**
+- Detects body landmarks using MediaPipe Pose  
+- Live joint-angle calculation  
+- Automatic repetition counter  
+- Form-correction alerts and posture feedback  
 
-2. Start the app
+### 📊 **Progress Reporting**
+- Generates detailed PDF reports  
+- Shows reps, form score, speed, and angle patterns  
+- Tracks improvement across sessions  
 
-   ```bash
-   npx expo start
-   ```
+### 🧑‍⚕️ **Doctor Dashboard**
+- Manage patient prescriptions  
+- Adjust exercises remotely  
+- View all reports and history  
 
-In the output, you'll find options to open the app in a
+### 👤 **Patient Portal**
+- Guided exercise sessions  
+- Real-time visual feedback  
+- Easy navigation and simple UI for all age groups  
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 🔒 **Secure & Reliable**
+- Encrypted data handling  
+- Privacy-focused workflow  
+- Fully compatible with mobile devices  
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## 🛠️ Tech Stack
 
-When you're ready, run:
+| Layer | Tools |
+|------|-------|
+| **Mobile App** | React Native (Expo), Axios, SVG |
+| **Backend** | FastAPI, Python |
+| **Pose Estimation** | MediaPipe Pose, OpenCV, NumPy |
+| **Reporting** | FPDF |
 
+---
+
+## 📷 Screenshots
+
+
+
+---
+
+## 📦 Getting Started
+
+Follow these steps to run Therap-Ease locally.
+
+### **1️⃣ Clone the Repository**
 ```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+git clone https://github.com/CouchPtato/Therapease.git
+cd Therapease/Therap-Ease
